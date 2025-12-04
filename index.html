@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>NameComms iOS</title>
+<style>
+    :root {
+        --bg: #000000;
+        --card: #1c1c1e;
+        --border: #38383a;
+        --accent: #0a84ff; /* iOS Blue */
+        --accent-glow: rgba(10, 132, 255, 0.4);
+        --danger: #ff453a; /* iOS Red */
+        --warn: #ffd60a;
+        --text: #ffffff;
+        --text-sec: #8e8e93;
+        --glass: rgba(28, 28, 30, 0.85);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+    body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height for mobile */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    /* --- iOS SAFE AREAS --- */
+    header {
+        padding-top: env(safe-area-inset-top);
+        background: var(--glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 0.5px solid var(--border);
+        z-index: 100;
+        position: absolute;
+        top: 0; width: 100%;
+    }
+
+    .header-content {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 17px;
+    }
+
+    /* --- TABS SYSTEM --- */
+    .tab-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 60px 20px 100px 20px; /* Space for header & footer */
+        display: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* --- CONTROLS CARD --- */
+    .ios-card {
+        background: var(--card);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+
+    .card-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        color: var(--text-sec);
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+
+    .row {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+    }
+    .row:last-child { margin-bottom: 0; }
+
+    label { font-size: 17px; }
+
+    /* --- SLIDERS --- */
+    input[type=range] {
+        width: 100%;
+        height: 4px;
+        background: #333;
+        border-radius: 2px;
+        -webkit-appearance: none;
+        margin-top: 10px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 28px; width: 28px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        margin-top: 0;
+    }
+
+    /* --- BUTTONS --- */
+    .ios-btn {
+        width: 100%;
+        padding: 14px;
+        border-radius: 12px;
+        background: var(--accent);
+        color: white;
+        font-size: 17px;
+        font-weight: 600;
+        border: none;
+        margin-bottom: 12px;
+    }
+    .ios-btn:active { opacity: 0.7; transform: scale(0.98); }
+    .ios-btn.danger { background: var(--danger); }
+    .ios-btn.secondary { background: #3a3a3c; }
+
+    /* --- VISUALS --- */
+    canvas {
+        width: 100%;
+        height: 120px;
+        background: #000;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+    
+    #bigWord {
+        font-size: 42px;
+        font-weight: 800;
+        text-align: center;
+        min-height: 60px;
+        color: var(--accent);
+        text-shadow: 0 0 20px var(--accent-glow);
+        margin: 20px 0;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    /* --- LOG LIST --- */
+    .log-list { display: flex; flex-direction: column; gap: 1px; }
+    .log-item {
+        background: var(--card);
+        padding: 12px 16px;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .log-item:first-child { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+    .log-item:last-child { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+    
+    .log-word { font-weight: 700; font-size: 17px; }
+    .log-meta { font-size: 13px; color: var(--text-sec); }
+    .log-item.anomaly .log-word { color: var(--warn); }
+    .log-item.critical .log-word { color: var(--danger); }
+
+    /* --- BOTTOM NAV --- */
+    .tab-bar {
+        position: fixed;
+        bottom: 0; width: 100%;
+        background: var(--glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 0.5px solid var(--border);
+        display: flex;
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(50px + env(safe-area-inset-bottom));
+        z-index: 100;
+    }
+
+    .tab-btn {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-sec);
+        font-size: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+    .tab-btn.active { color: var(--accent); }
+    .tab-icon { font-size: 20px; }
+
+    /* --- START OVERLAY --- */
+    #overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: #000;
+        z-index: 9999;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 20px; text-align: center;
+    }
+    #overlay h2 { margin-bottom: 10px; color: var(--accent); }
+    #overlay p { color: var(--text-sec); margin-bottom: 30px; font-size: 15px; }
+
+    /* --- METERS --- */
+    .meter-track { height: 6px; background: #333; border-radius: 3px; overflow: hidden; width: 100px; }
+    .meter-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s; }
+
+</style>
+</head>
+<body>
+
+<header>
+    <div class="header-content">NameComms iOS</div>
+</header>
+
+<div id="overlay">
+    <h2>SYSTEM READY</h2>
+    <p>Please turn off Silent Mode (Side Switch) or audio will not play.</p>
+    <button class="ios-btn" onclick="App.unlock()">TAP TO START SESSION</button>
+</div>
+
+<div id="tab-dash" class="tab-content active">
+    
+    <div id="bigWord">INITIALIZING</div>
+
+    <div class="ios-card">
+        <div class="card-title">Live Visualization</div>
+        <canvas id="scopeCanvas"></canvas>
+        <canvas id="specCanvas"></canvas>
+        <div class="row">
+            <span style="font-size:13px; color:var(--text-sec)">Z-SCORE VARIANCE</span>
+            <span id="lblZ" style="font-family:monospace; font-weight:bold;">0.00σ</span>
+        </div>
+    </div>
+
+    <div class="ios-card">
+        <div class="card-title">Quick Actions</div>
+        <button id="btnRec" class="ios-btn danger" onclick="Recorder.toggle()">Record EVP (Silent)</button>
+        <div id="recStatus" style="text-align:center; color:var(--danger); font-size:13px; display:none; margin-bottom:10px;">
+            ● RECORDING <span id="recTime">00:00</span>
+        </div>
+        <button class="ios-btn secondary" onclick="UI.clearLog()">Clear Log</button>
+    </div>
+
+</div>
+
+<div id="tab-controls" class="tab-content">
+    
+    <div class="ios-card">
+        <div class="card-title">Signal Input</div>
+        
+        <label>Entropy Mix</label>
+        <div class="row">
+            <span style="font-size:12px; color:var(--text-sec)">MIC</span>
+            <span style="font-size:12px; color:var(--text-sec)">MATH</span>
+        </div>
+        <input type="range" value="50" oninput="Engine.setMix(this.value)">
+        
+        <br><br>
+        
+        <label>Anomaly Threshold</label>
+        <div class="row">
+            <span style="font-size:12px; color:var(--text-sec)" id="valThresh">3.5σ</span>
+        </div>
+        <input type="range" min="2.5" max="6.0" step="0.1" value="3.5" oninput="Engine.setThresh(this.value)">
+    </div>
+
+    <div class="ios-card">
+        <div class="card-title">Audio Output</div>
+        <label>Synth Volume</label>
+        <input type="range" value="50" oninput="Engine.setVol(this.value)">
+        
+        <br><br>
+
+        <div class="row">
+            <label>Live Echo (Monitor)</label>
+            <button class="ios-btn secondary" style="width:80px; padding:8px;" onclick="Engine.toggleEcho(this)">OFF</button>
+        </div>
+        
+        <br>
+
+        <div class="row">
+            <label>Voice Pitch</label>
+            <span style="font-size:12px; color:var(--text-sec)" id="valPitch">0.8</span>
+        </div>
+        <input type="range" min="0.1" max="2.0" step="0.1" value="0.8" oninput="Engine.setPitch(this.value)">
+    </div>
+
+</div>
+
+<div id="tab-logs" class="tab-content">
+    <div class="ios-card">
+        <div class="card-title">Session History</div>
+        <div id="logList" class="log-list">
+            </div>
+    </div>
+    <button class="ios-btn secondary" onclick="UI.downloadLog()">Export Log</button>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="UI.switchTab('dash', this)">
+        <span class="tab-icon">⦿</span>
+        <span>Monitor</span>
+    </button>
+    <button class="tab-btn" onclick="UI.switchTab('controls', this)">
+        <span class="tab-icon">⚡</span>
+        <span>Controls</span>
+    </button>
+    <button class="tab-btn" onclick="UI.switchTab('logs', this)">
+        <span class="tab-icon">≡</span>
+        <span>Logs</span>
+    </button>
+</div>
+
+<script>
+/**
+ * NAMECOMMS iOS OPTIMIZED ENGINE
+ */
+
+const DICTIONARY = ["the","of","to","and","a","in","is","it","you","that","he","was","for","on","are","with","as","I","his","they","be","at","one","have","this","from","or","had","by","hot","word","but","what","some","we","can","out","other","were","all","there","when","up","use","your","how","said","an","each","she","spirit","ghost","death","life","shadow","light","dark","fear","help","pain","cold","leave","stay","below","above","love","hate","anger","peace","war","blood","red","black","white","noise","static","voice","hear","speak","listen","friend","enemy","demon","angel","god","devil","gate","key","lock","open","close","energy","signal","message","look","see","watch","hidden","found","lost","mother","father","child","home","away","near","far","time","now","past","future","dream","wake","sleep","die","live","end","begin","stop","go","wait","run","hide","seek","truth","lie"];
+
+// --- UI MANAGER ---
+const UI = (() => {
+    function switchTab(id, btn) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-'+id).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function log(word, z) {
+        const list = document.getElementById('logList');
+        const item = document.createElement('div');
+        const type = z > 5.0 ? 'critical' : (z > 3.5 ? 'anomaly' : '');
+        
+        item.className = `log-item ${type}`;
+        item.innerHTML = `
+            <div class="log-word">${word.toUpperCase()}</div>
+            <div class="log-meta">${new Date().toLocaleTimeString()} • ${z.toFixed(2)}σ</div>
+        `;
+        list.prepend(item);
+        if(list.children.length > 50) list.lastChild.remove();
+    }
+
+    function flashWord(word) {
+        const el = document.getElementById('bigWord');
+        el.innerText = word.toUpperCase();
+        el.style.opacity = 1;
+        setTimeout(() => el.style.opacity = 0, 2500);
+    }
+
+    function downloadLog() {
+        // iOS Safari Logic: Create blob, open in new tab so user can "Save to Files"
+        const txt = Array.from(document.querySelectorAll('.log-item')).map(e => 
+            e.querySelector('.log-word').innerText + " " + e.querySelector('.log-meta').innerText
+        ).join('\n');
+        
+        const blob = new Blob([txt], {type: 'text/plain'});
+        const url = URL.createObjectURL(blob);
+        
+        // Create a temporary link
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `NC_Log_${Date.now()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    return { switchTab, log, flashWord, clearLog: () => document.getElementById('logList').innerHTML = "", downloadLog };
+})();
+
+// --- AUDIO ENGINE ---
+const Engine = (() => {
+    let ctx, master, noise, sweep;
+    let micSource, analyser;
+    let loopId;
+    let volume = 0.5;
+    let mixRatio = 0.5;
+    let threshold = 3.5;
+    let pitch = 0.8;
+    let history = [];
+
+    // Initialize on User Touch
+    async function init() {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC();
+        
+        // Master Gain
+        master = ctx.createGain();
+        master.gain.value = volume;
+        master.connect(ctx.destination);
+
+        // Pink Noise Synth
+        const bSize = ctx.sampleRate * 2;
+        const b = ctx.createBuffer(1, bSize, ctx.sampleRate);
+        const d = b.getChannelData(0);
+        let last = 0;
+        for(let i=0; i<bSize; i++) {
+            const w = Math.random()*2-1;
+            d[i] = (last + (0.02 * w)) / 1.02;
+            last = d[i];
+            d[i] *= 3.5;
+        }
+        noise = ctx.createBufferSource();
+        noise.buffer = b;
+        noise.loop = true;
+
+        // Filter
+        sweep = ctx.createBiquadFilter();
+        sweep.type = 'bandpass';
+        sweep.frequency.value = 500;
+        sweep.Q.value = 1;
+
+        noise.connect(sweep);
+        sweep.connect(master);
+        noise.start();
+
+        // Analyzer
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+
+        // Mic
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            micSource = ctx.createMediaStreamSource(stream);
+            micSource.connect(analyser); // Analyze only, don't output yet
+        } catch(e) {
+            console.warn("Mic denied");
+            mixRatio = 1; // Full math if no mic
+        }
+
+        // Force Wake TTS
+        speak("");
+
+        // Start loops
+        startLogic();
+        Vis.start(analyser);
+    }
+
+    function startLogic() {
+        const arr = new Uint8Array(analyser.frequencyBinCount);
+        
+        loopId = setInterval(() => {
+            let micLevel = 0;
+            if(analyser) {
+                analyser.getByteTimeDomainData(arr);
+                let sum = 0;
+                for(let i=0; i<arr.length; i++) {
+                    const v = (arr[i]-128)/128;
+                    sum += v*v;
+                }
+                micLevel = Math.sqrt(sum/arr.length) * 5; 
+            }
+            
+            const cryptoLevel = crypto.getRandomValues(new Uint32Array(1))[0]/0xFFFFFFFF;
+            const finalEnt = (micLevel * (1-mixRatio)) + (cryptoLevel * mixRatio);
+
+            // Modulate Audio
+            if(sweep) {
+                const f = 200 + (finalEnt * 2000);
+                sweep.frequency.setTargetAtTime(f, ctx.currentTime, 0.1);
+            }
+
+            // Stats
+            history.push(finalEnt);
+            if(history.length > 100) history.shift();
+            
+            if(history.length > 50) {
+                const sorted = [...history].sort((a,b)=>a-b);
+                const median = sorted[Math.floor(sorted.length/2)];
+                const devs = history.map(x=>Math.abs(x-median));
+                const mad = [...devs].sort((a,b)=>a-b)[Math.floor(devs.length/2)] * 1.4826;
+                const z = mad===0 ? 0 : Math.abs((finalEnt-median)/mad);
+
+                document.getElementById('lblZ').innerText = z.toFixed(2)+"σ";
+
+                if(z > threshold) {
+                    if(Math.random() > 0.4) { // Debounce
+                        const w = DICTIONARY[Math.floor(Math.random()*DICTIONARY.length)];
+                        UI.log(w, z);
+                        UI.flashWord(w);
+                        speak(w);
+                    }
+                }
+            }
+
+        }, 100);
+    }
+
+    function speak(txt) {
+        if('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(txt);
+            u.pitch = pitch;
+            u.rate = 0.9;
+            window.speechSynthesis.speak(u);
+        }
+    }
+
+    let echoNode;
+    function toggleEcho(btn) {
+        if(!micSource) return;
+        
+        if(btn.innerText === "OFF") {
+            btn.innerText = "ON";
+            btn.style.color = "var(--accent)";
+            // Create Delay
+            echoNode = ctx.createDelay();
+            echoNode.delayTime.value = 0.3;
+            const fb = ctx.createGain();
+            fb.gain.value = 0.4;
+            echoNode.connect(fb);
+            fb.connect(echoNode);
+            micSource.connect(echoNode);
+            echoNode.connect(master);
+        } else {
+            btn.innerText = "OFF";
+            btn.style.color = "var(--text-sec)";
+            if(echoNode) {
+                echoNode.disconnect();
+                echoNode = null;
+            }
+        }
+    }
+
+    return {
+        init,
+        setMix: (v) => mixRatio = v/100,
+        setThresh: (v) => { threshold = parseFloat(v); document.getElementById('valThresh').innerText = v+"σ"; },
+        setVol: (v) => { volume = v/100; if(master) master.gain.value = volume; },
+        setPitch: (v) => { pitch = parseFloat(v); document.getElementById('valPitch').innerText = v; },
+        mute: (m) => { if(master) master.gain.value = m ? 0 : volume; },
+        toggleEcho
+    };
+})();
+
+// --- RECORDER ---
+const Recorder = (() => {
+    let rec, chunks = [], timer;
+    let isRecording = false;
+
+    async function toggle() {
+        const btn = document.getElementById('btnRec');
+        const status = document.getElementById('recStatus');
+        
+        if(!isRecording) {
+            // Start
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+                // Mute synth for clear EVP
+                Engine.mute(true);
+                
+                rec = new MediaRecorder(stream);
+                chunks = [];
+                rec.ondataavailable = e => chunks.push(e.data);
+                rec.onstop = save;
+                rec.start();
+                
+                isRecording = true;
+                btn.innerText = "STOP & SAVE";
+                status.style.display = 'block';
+                
+                let s = 0;
+                timer = setInterval(() => {
+                    s++;
+                    const m = Math.floor(s/60).toString().padStart(2,'0');
+                    const sc = (s%60).toString().padStart(2,'0');
+                    document.getElementById('recTime').innerText = `${m}:${sc}`;
+                }, 1000);
+            } catch(e) {
+                alert("Mic Error");
+            }
+        } else {
+            // Stop
+            rec.stop();
+            isRecording = false;
+            clearInterval(timer);
+            Engine.mute(false);
+            btn.innerText = "Record EVP (Silent)";
+            status.style.display = 'none';
+        }
+    }
+
+    async function save() {
+        const blob = new Blob(chunks, {type:'audio/webm'});
+        // Convert to WAV/Process logic omitted for brevity in iOS view, but WebM works in Files app
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `EVP_${Date.now()}.webm`; // iPhone prefers this container from web
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    return { toggle };
+})();
+
+// --- VISUALIZER ---
+const Vis = (() => {
+    function start(analyser) {
+        const c1 = document.getElementById('scopeCanvas');
+        const x1 = c1.getContext('2d');
+        const c2 = document.getElementById('specCanvas');
+        const x2 = c2.getContext('2d');
+        
+        function loop() {
+            requestAnimationFrame(loop);
+            
+            // Resize logic inside loop for mobile rotation
+            c1.width = c1.clientWidth; c1.height = c1.clientHeight;
+            c2.width = c2.clientWidth; c2.height = c2.clientHeight;
+
+            const len = analyser.frequencyBinCount;
+            const time = new Uint8Array(len);
+            const freq = new Uint8Array(len);
+            
+            analyser.getByteTimeDomainData(time);
+            analyser.getByteFrequencyData(freq);
+
+            // Scope
+            x1.clearRect(0,0,c1.width,c1.height);
+            x1.lineWidth = 2;
+            x1.strokeStyle = '#0a84ff';
+            x1.beginPath();
+            let slice = c1.width/len; let x=0;
+            for(let i=0; i<len; i++) {
+                let v = time[i]/128.0; let y = v*c1.height/2;
+                if(i===0) x1.moveTo(x,y); else x1.lineTo(x,y);
+                x+=slice;
+            }
+            x1.stroke();
+
+            // Spec
+            x2.clearRect(0,0,c2.width,c2.height);
+            let barW = (c2.width/len)*2.5; let bx=0;
+            for(let i=0; i<len; i++) {
+                let h = (freq[i]/255)*c2.height;
+                x2.fillStyle = `rgb(${h}, 50, 150)`;
+                x2.fillRect(bx, c2.height-h, barW, h);
+                bx+=barW+1;
+            }
+        }
+        loop();
+    }
+    return { start };
+})();
+
+// --- APP INIT ---
+const App = (() => {
+    function unlock() {
+        document.getElementById('overlay').style.display = 'none';
+        Engine.init();
+    }
+    return { unlock };
+})();
+
+</script>
+</body>
+</html>
